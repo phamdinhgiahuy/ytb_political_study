@@ -13,14 +13,14 @@ YOUTUBERS = [
 
 # Scraping settings
 MAX_VIDEOS_PER_CHANNEL = 4000  # Maximum videos to process per channel
-MAX_COMMENTS_PER_VIDEO = 1000  # Maximum comments to collect per video
+MAX_COMMENTS_PER_VIDEO = 200  # Maximum comments to collect per video
 
 # Output settings
 OUTPUT_FORMAT = 'both'  # 'json', 'csv', or 'both'
 
 # Rate limiting (in seconds)
-DELAY_BETWEEN_VIDEOS = 1.0  # Delay between processing videos
-DELAY_BETWEEN_COMMENTS = 0.1  # Delay between collecting comments
+DELAY_BETWEEN_VIDEOS = 0.5  # Delay between processing videos
+DELAY_BETWEEN_COMMENTS = 0  # Delay between collecting comments
 
 # File paths
 OUTPUT_DIR = "data"  # Directory for output files

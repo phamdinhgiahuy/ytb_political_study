@@ -259,19 +259,20 @@ class YouTubeScraper:
         for i, channel_handle in enumerate(channel_handles):
             logger.info(f"Processing channel {i+1}/{len(channel_handles)}: {channel_handle}")
             
-            # Define cache file path for this channel
+            # Define cache file paths for this channel
             cache_file = self.cache_dir / f"{channel_handle.replace('@', '')}_videos.pkl"
+            video_list_cache_file = self.cache_dir / f"{channel_handle.replace('@', '')}_videos_list.json"
             
-            # Check if we have cached data
+            # Check if we have cached mined data
             if cache_file.exists():
-                logger.info(f"Loading cached data for {channel_handle}")
+                logger.info(f"Loading cached mined data for {channel_handle}")
                 try:
                     with open(cache_file, 'rb') as f:
                         cached_data = pickle.load(f)
                     all_videos_data.extend(cached_data)
                     continue
                 except Exception as e:
-                    logger.warning(f"Failed to load cache for {channel_handle}: {e}")
+                    logger.warning(f"Failed to load mined data cache for {channel_handle}: {e}")
             
             # Get channel upload playlist
             channel_id = channel_ids[i] if channel_ids and i < len(channel_ids) else None
@@ -281,14 +282,33 @@ class YouTubeScraper:
                 logger.error(f"Could not get upload playlist for {channel_handle}")
                 continue
             
-            # Get videos from playlist
-            videos = self.get_playlist_videos(playlist_id, max_videos_per_channel)
-            logger.info(f"Found {len(videos)} videos for {channel_handle}")
+            # Try to load video list from cache
+            videos = None
+            if video_list_cache_file.exists():
+                logger.info(f"Loading video list from cache for {channel_handle}")
+                try:
+                    with open(video_list_cache_file, 'r', encoding='utf-8') as f:
+                        videos = json.load(f)
+                except Exception as e:
+                    logger.warning(f"Failed to load video list cache for {channel_handle}: {e}")
+            
+            # If not cached, fetch from API and cache
+            if videos is None:
+                logger.info(f"Fetching video list from API for {channel_handle}")
+                videos = self.get_playlist_videos(playlist_id, max_videos_per_channel)
+                try:
+                    with open(video_list_cache_file, 'w', encoding='utf-8') as f:
+                        json.dump(videos, f, ensure_ascii=False, indent=2)
+                    logger.info(f"Cached video list for {channel_handle}")
+                except Exception as e:
+                    logger.warning(f"Failed to cache video list for {channel_handle}: {e}")
+            else:
+                logger.info(f"Found {len(videos)} videos for {channel_handle} (from cache)")
             
             channel_videos_data = []
             
             for j, video in enumerate(videos):
-                video_id = video['contentDetails']['videoId']
+                video_id = video['contentDetails']['videoId'] if 'contentDetails' in video and 'videoId' in video['contentDetails'] else video.get('video_id')
                 logger.info(f"Processing video {j+1}/{len(videos)}: {video_id}")
                 
                 # Get detailed video information
@@ -322,16 +342,17 @@ class YouTubeScraper:
                 
                 channel_videos_data.append(video_data)
                 
+                # Incremental cache every 50 videos
+                if (j + 1) % 50 == 0 or (j + 1) == len(videos):
+                    try:
+                        with open(cache_file, 'wb') as f:
+                            pickle.dump(channel_videos_data, f)
+                        logger.info(f"Incrementally cached {len(channel_videos_data)} videos for {channel_handle}")
+                    except Exception as e:
+                        logger.warning(f"Failed to incrementally cache data for {channel_handle}: {e}")
+                
                 # Add delay between videos to be respectful
                 time.sleep(DELAY_BETWEEN_VIDEOS)
-            
-            # Cache the channel data
-            try:
-                with open(cache_file, 'wb') as f:
-                    pickle.dump(channel_videos_data, f)
-                logger.info(f"Cached data for {channel_handle}")
-            except Exception as e:
-                logger.warning(f"Failed to cache data for {channel_handle}: {e}")
             
             all_videos_data.extend(channel_videos_data)
         
